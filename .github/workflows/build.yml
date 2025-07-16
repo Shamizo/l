@@ -1,7 +1,7 @@
 name: CI
 
 on:
-  workflow_dispatch:   # 改为手动触发
+  workflow_dispatch:   # 手动触发
 
 jobs:
   build:
@@ -25,8 +25,32 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-maven-
 
-      - name: Decode and set up Maven settings
-        run: echo "${{ secrets.MAVEN_SETTINGS_BASE64 }}" | base64 --decode > $HOME/.m2/settings.xml
+      - name: Setup Maven settings
+        run: |
+          # 检查 Secret 是否为空
+          if [ -z "${{ secrets.MAVEN_SETTINGS_BASE64 }}" ]; then
+            echo "Using default Maven settings"
+            mkdir -p $HOME/.m2
+            cat > $HOME/.m2/settings.xml <<EOF
+            <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+                      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                      xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0
+                                          https://maven.apache.org/xsd/settings-1.0.0.xsd">
+              <mirrors>
+                <mirror>
+                  <id>central</id>
+                  <name>Central Repository</name>
+                  <url>https://repo.maven.apache.org/maven2</url>
+                  <mirrorOf>central</mirrorOf>
+                </mirror>
+              </mirrors>
+            </settings>
+            EOF
+          else
+            echo "Creating settings.xml from secret"
+            mkdir -p $HOME/.m2
+            echo "${{ secrets.MAVEN_SETTINGS_BASE64 }}" | base64 --decode > $HOME/.m2/settings.xml
+          fi
 
       - name: Build with Maven
         run: mvn --batch-mode clean install
